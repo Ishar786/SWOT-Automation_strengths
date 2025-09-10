@@ -130,7 +130,6 @@ def get_strengths_analysis(chunks, company_name, industry, api_key):
     # Format all relevant chunks into one large string for a single API call
     formatted_mega_batch = "\n---\n".join([f'Chunk {i+1}:\n"""{chunk.page_content}"""' for i, chunk in enumerate(relevant_chunks)])
     
-    # Check token count before sending to API
     if len(formatted_mega_batch) > 900000: # Leave a buffer for the prompt template
         st.error(f"The filtered content ({len(formatted_mega_batch)} characters) is too large for the model's 1 million token context window. Please try a smaller document.")
         return None
@@ -176,7 +175,6 @@ def get_strengths_analysis(chunks, company_name, industry, api_key):
     # --- Generate Final Output ---
     st.write("✍️ Generating final analysis...")
     strengths_output = ""
-    # Make only two generation calls
     for item in final_strength_chunks:
         category = item["category"]
         text = item["text"]
@@ -197,16 +195,19 @@ st.markdown("This tool uses a multi-step AI pipeline (**Classify -> Rank -> Gene
 
 # --- API Key Handling ---
 st.sidebar.header("Configuration")
-google_api_key = st.sidebar.text_input("Enter your Google API Key:", type="password", key="google_api_key")
+# Use a different key for the widget to avoid potential name clashes with the session_state key
+api_key_input = st.sidebar.text_input("Enter your Google API Key:", type="password", key="api_key_input_widget")
 
+# THE FIX: Remove the immediate st.rerun() call for more stable state handling
 if st.sidebar.button("Set API Key", type="primary"):
-    if google_api_key:
-        st.session_state.google_api_key = google_api_key
-        st.rerun()
+    if api_key_input:
+        st.session_state.google_api_key = api_key_input
+        # The script will rerun naturally after the button click, no need to force it.
     else:
-        st.sidebar.error("Please enter your API key.")
+        st.sidebar.error("Please enter an API key.")
 
 # --- Main App Logic ---
+# The rest of the script now checks for the key set in st.session_state
 if 'google_api_key' in st.session_state and st.session_state.google_api_key:
     try:
         genai.configure(api_key=st.session_state.google_api_key)
@@ -242,6 +243,7 @@ if 'google_api_key' in st.session_state and st.session_state.google_api_key:
         st.error(f"Details: {e}")
         if 'google_api_key' in st.session_state:
             del st.session_state.google_api_key
+        # Use st.rerun() here to reset the app state after an error
         st.rerun()
 
 else:
